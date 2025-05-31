@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Let the Universe Decide</title>
+<style>
+body{font-family:system-ui;margin:2rem;max-width:700px}
+h1{font-size:1.8rem;text-align:center;margin-bottom:1rem}
+/* Table + form */
+table{width:100%;border-collapse:collapse;margin-bottom:1rem}
+th,td{padding:.4rem}
+tr:nth-child(even){background:#f5f5f5}
+input[type="text"]{width:90%}
+input[type="range"]{width:100%}
+button{padding:.4rem .8rem;border:1px solid #888;border-radius:6px;background:#eee;cursor:pointer}
+#decideBtn[disabled]{opacity:.5;cursor:not-allowed}
+/* Totals + viz */
+#total{font-weight:700}
+#total.bad{color:#c62828}
+#viz{display:flex;height:18px;margin-bottom:1rem;border:1px solid #ddd;border-radius:4px;position:relative;overflow:visible}
+.bar{height:100%}
+/* Down‑arrow selector */
+#selector{position:absolute;top:-12px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:10px solid #000;transform:translateX(-50%);pointer-events:none;z-index:2}
+</style>
+</head>
+<body>
+<h1>✨ Let the Universe Decide ✨</h1>
+
+<table id="choicesTbl">
+<thead>
+<tr><th>Option</th><th style="width:40%">Weight (%)</th><th></th></tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<button id="addBtn">＋ Add option</button>
+
+<p>Total: <span id="total">0</span>% (must equal 100)</p>
+<div id="viz"><div id="selector" style="display:none"></div></div>
+
+<button id="decideBtn" disabled>Let the Universe Decide</button>
+<p id="result" style="font-size:1.3rem;font-weight:600;margin-top:1rem"></p>
+
+<script>
+const tblBody=document.querySelector('#choicesTbl tbody');
+const totalSpan=document.getElementById('total');
+const decideBtn=document.getElementById('decideBtn');
+const viz=document.getElementById('viz');
+const selector=document.getElementById('selector');
+document.getElementById('addBtn').onclick=()=>addRow();
+
+function addRow(name='',weight=0){
+  const row=tblBody.insertRow();
+  row.innerHTML=`
+    <td><input type="text" value="${name}" placeholder="Restaurant, idea, …"></td>
+    <td>
+      <input type="range" min="0" max="100" value="${weight}">
+      <span class="wVal">${weight}</span>
+    </td>
+    <td><button class="del">🗑️</button></td>`;
+  row.querySelector('input[type="range"]').oninput=e=>{
+     row.querySelector('.wVal').textContent=e.target.value;
+     updateTotals();
+  };
+  row.querySelector('.del').onclick=()=>{
+     row.remove();
+     updateTotals();
+  };
+  updateTotals();
+}
+// start with two blank rows
+['',''].forEach(()=>addRow());
+
+function updateTotals(){
+  const weights=[...tblBody.querySelectorAll('input[type="range"]')].map(r=>+r.value);
+  const sum=weights.reduce((a,b)=>a+b,0);
+  totalSpan.textContent=sum;
+  totalSpan.classList.toggle('bad',sum!==100);
+  decideBtn.disabled=(sum!==100||tblBody.rows.length===0);
+  renderViz(weights);
+}
+
+function renderViz(weights){
+  const colors=['#42a5f5','#66bb6a','#ffa726','#ab47bc','#ef5350','#8d6e63'];
+  viz.querySelectorAll('.bar').forEach(b=>b.remove());
+  const sum=weights.reduce((a,b)=>a+b,0)||1;
+  weights.forEach((w,i)=>{
+    const bar=document.createElement('div');
+    bar.className='bar';
+    bar.style.background=colors[i%colors.length];
+    bar.style.flex=w/sum;
+    viz.appendChild(bar);
+  });
+}
+
+decideBtn.onclick=()=>{
+  const rows=[...tblBody.rows];
+  const weights=rows.map(r=>+r.querySelector('input[type="range"]').value);
+  const names=rows.map((r,idx)=>r.querySelector('input[type="text"]').value||`Option ${idx+1}`);
+  decideBtn.disabled=true;
+  selector.style.display='block';
+  selector.style.transition='none'; // no smooth slide during flashes
+  let flashes=20,count=0;
+  const flashInterval=100;
+  const iv=setInterval(()=>{
+    selector.style.left=Math.random()*100+'%'; // instant jump
+    count++;
+    if(count>=flashes){
+      clearInterval(iv);
+      const winIdx=weightedPick(weights);
+      const finalPos=pctMidpoint(weights,winIdx);
+      selector.style.left=finalPos+'%';
+      document.getElementById('result').textContent=`🪄 The universe says: “${names[winIdx]}”`;
+      decideBtn.disabled=false;
+    }
+  },flashInterval);
+};
+
+function weightedPick(weights){
+  let r=Math.random()*100,acc=0;
+  for(let i=0;i<weights.length;i++){
+    acc+=weights[i];
+    if(r<=acc)return i;
+  }
+  return weights.length-1;
+}
+function pctMidpoint(weights,idx){
+  let cum=weights.slice(0,idx).reduce((a,b)=>a+b,0);
+  return cum+weights[idx]/2;
+}
+</script>
+</body>
+</html>
